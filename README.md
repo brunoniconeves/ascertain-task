@@ -81,6 +81,110 @@ curl -s -X POST localhost:8000/patients \
   -d '{"name":"Ada Lovelace","date_of_birth":"1815-12-10"}'
 ```
 
+## 📝 Patient Notes & SOAP Handling
+
+This API supports storing patient notes as part of a patient’s medical record. Notes may be provided as **plain text** or as **uploaded files**, and may optionally follow the **SOAP (Subjective, Objective, Assessment, Plan)** clinical format.
+
+### Core Design Principle
+
+The system explicitly separates:
+
+- **Raw clinical notes** → **authoritative source of truth**
+- **Structured data** → **derived, non-authoritative metadata**
+
+The original note content is always preserved exactly as provided. Any structured data extracted from it never replaces or modifies the original note. This mirrors real healthcare and compliance requirements, where original clinical documentation must remain intact for auditability and legal purposes.
+
+
+## Supported Inputs
+
+SOAP-formatted notes may be submitted in either form:
+
+1. A `.txt` file upload containing SOAP content  
+2. Plain text in the request body using the same SOAP format  
+
+Once raw text is available, both inputs are handled identically by the system.
+
+
+
+## SOAP Parsing Behavior
+
+When `note_type = "soap"` is explicitly provided, the system attempts a **deterministic, best-effort parse** of the note into SOAP sections:
+
+- **S** – Subjective  
+- **O** – Objective  
+- **A** – Assessment  
+- **P** – Plan  
+
+Parsing rules:
+- Based only on explicit section markers (`S:`, `O:`, `A:`, `P:`)
+- Missing or partial sections are allowed
+- Parsing failures **never block ingestion**
+- No AI, NLP, or inference is used
+
+If parsing succeeds, structured data is stored as derived metadata. If parsing fails, the raw note is still stored and the request succeeds.
+
+
+
+## Data Flow (Diagram)
+
+> The diagram above illustrates how raw clinical notes are ingested, preserved as the source of truth, and optionally parsed into derived SOAP-structured data.
+
+
+<p align="center">
+  <img src="docs/diagrams/note-flow-diagram.png" alt="SOAP Note Ingestion Flow" width="700"/>
+</p>
+
+
+## Structured Data Storage
+
+When available, parsed SOAP data is stored separately from the raw note as structured JSON, for example:
+
+```json
+{
+  "schema": "soap_v1",
+  "parser_version": "v1",
+  "sections": {
+    "subjective": "...",
+    "objective": "...",
+    "assessment": "...",
+    "plan": "..."
+  }
+}
+```
+
+## Get Notes endpoint
+
+When available, derived structured data (e.g. parsed SOAP sections) is returned alongside the raw note. This data is optional, non-authoritative, and explicitly marked as derived.
+
+### Pagination endpoint vs single-note endpoint
+For list endpoint (GET /patients/{id}/notes)
+
+Returning structured data is OK because:
+
+- Notes are short
+
+- Structured data is small
+
+- This is a take-home, not a high-traffic prod system
+
+- If this were production-scale we might add ?include_structured=true or only return structured data on detail endpoints
+
+
+## Why This Design
+
+- Preserves clinical and legal integrity
+
+- Enables structured querying without data loss
+
+- Parsing is transparent, explainable, and non-blocking
+
+- Avoids overengineering and unsafe inference
+
+- Reflects real-world healthcare system constraints
+
+In a production system, structured data could later be augmented by OCR or NLP tools, but the clinician-provided note would always remain the authoritative record.
+
+
 ## Logging & security (HIPAA/LGPD-aware)
 
 This service includes an HTTP logging middleware that is designed to be safe in healthcare environments.

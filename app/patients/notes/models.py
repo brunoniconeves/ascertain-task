@@ -4,12 +4,14 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
     func,
 )
@@ -94,6 +96,12 @@ class PatientNote(Base):
         back_populates="note",
         lazy="selectin",
     )
+    structured = relationship(
+        "PatientNoteStructured",
+        back_populates="note",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def has_file(self) -> bool:
@@ -134,3 +142,54 @@ class PatientNoteText(Base):
     )
 
     note: Mapped[PatientNote] = relationship("PatientNote", back_populates="extracted_text")
+
+
+class PatientNoteStructured(Base):
+    """
+    Optional derived structured data extracted from the raw note content.
+
+    This is non-authoritative: the raw note (inline text or file) remains the clinical
+    source of truth.
+    """
+
+    __tablename__ = "patient_note_structured"
+    __table_args__ = (
+        # Allow multiple derived schemas per note over time, but only one row per schema.
+        UniqueConstraint("note_id", "schema", name="patient_note_structured_note_schema_unique"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    note_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("patient_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # E.g. "soap_v1" - enables future derived schemas without changing the table shape.
+    schema: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # How the parser was fed (kept generic for future parsers).
+    parsed_from: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # Parser implementation version (not the schema version).
+    parser_version: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Best-effort confidence indicator (do not treat as a guarantee).
+    confidence: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Schema-owned payload; for SOAP: {"sections": {"subjective": ..., ...}, ...}
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    note: Mapped[PatientNote] = relationship("PatientNote", back_populates="structured")

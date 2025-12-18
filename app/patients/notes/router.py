@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import mimetypes
 import uuid
 from datetime import UTC, datetime
@@ -12,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.settings import get_settings
 from app.domain.exceptions import BusinessValidationError
-from app.patients.service import get_patient
 from app.patients.notes.schemas import PatientNoteCreateJson, PatientNoteListOut, PatientNoteOut
 from app.patients.notes.service import (
     create_file_patient_note,
@@ -22,8 +22,11 @@ from app.patients.notes.service import (
     soft_delete_patient_note,
 )
 from app.patients.notes.storage import LocalFileStorage, PayloadTooLargeError, StorageIOError
+from app.patients.service import get_patient
 
 router = APIRouter(prefix="/{patient_id}/notes", tags=["patient-notes"])
+logger = logging.getLogger("app.soap")
+
 
 def _sniff_mime_type(upload) -> str | None:
     """
@@ -131,7 +134,9 @@ async def create_patient_note(
             raw = await request.json()
             payload = PatientNoteCreateJson.model_validate(raw)
         except ValidationError as exc:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()) from exc
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+            ) from exc
 
         try:
             note = await create_inline_patient_note(
@@ -143,7 +148,9 @@ async def create_patient_note(
                 content_mime_type=payload.content_mime_type,
             )
         except BusinessValidationError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message) from exc
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message
+            ) from exc
 
         return PatientNoteOut.model_validate(note)
 
@@ -160,12 +167,16 @@ async def create_patient_note(
         # Starlette returns UploadFile here; type is runtime-checked by usage below.
         taken_at_raw = form.get("taken_at")
         if taken_at_raw is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="taken_at is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="taken_at is required"
+            )
 
         try:
             taken_at = TypeAdapter(datetime).validate_python(taken_at_raw)
         except ValidationError as exc:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()) from exc
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+            ) from exc
 
         note_type_raw = form.get("note_type")
         note_type = str(note_type_raw) if note_type_raw is not None else None
@@ -184,6 +195,30 @@ async def create_patient_note(
 
         storage = LocalFileStorage(base_dir=Path(settings.local_storage_base_path))
         max_bytes = int(settings.max_note_upload_mb) * 1024 * 1024
+
+        # Best-effort SOAP parsing requires raw text. For file-backed notes we only attempt
+        # this for text/plain uploads; parsing is deterministic and must never block creation.
+        raw_text_for_parsing: str | None = None
+        if (note_type or "").strip().lower() == "soap" and mime_type == "text/plain":
+            try:
+                f = getattr(upload, "file", None)
+                if f is not None:
+                    f.seek(0)
+                    raw_bytes = f.read()
+                    f.seek(0)
+                    try:
+                        raw_text_for_parsing = raw_bytes.decode("utf-8")
+                    except UnicodeDecodeError:
+                        # Deterministic fallback; do not log content/filenames.
+                        raw_text_for_parsing = raw_bytes.decode("utf-8", errors="replace")
+                        logger.warning(
+                            "SOAP decode used replacement characters (note_id=%s)", str(note_id)
+                        )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "SOAP pre-parse read failed; continuing without derived parse (error=%s)",
+                    exc.__class__.__name__,
+                )
 
         try:
             stored = await storage.save(
@@ -210,6 +245,7 @@ async def create_patient_note(
                 note_type=note_type,
                 content_mime_type=mime_type,
                 stored_file=stored,
+                raw_text_for_parsing=raw_text_for_parsing,
             )
         except Exception:
             try:
@@ -240,7 +276,7 @@ async def delete_note(
     if note is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
 
-    # Soft delete for auditability, but ensure file is removed so DB "deleted" implies content is gone.
+    # Soft delete for auditability. Ensure file is removed so DB "deleted" implies content is gone.
     settings = get_settings()
     if note.file_path:
         if settings.file_storage_backend != "local":
@@ -253,5 +289,3 @@ async def delete_note(
 
     await soft_delete_patient_note(session=session, note=note, deleted_at=datetime.now(UTC))
     return None
-
-

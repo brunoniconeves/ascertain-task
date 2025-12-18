@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import Select, and_, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.exceptions import BusinessValidationError
 from app.patients.models import Patient
 from app.patients.notes.cursor_pagination import NoteCursor, decode_note_cursor, encode_note_cursor
-from app.patients.notes.models import PatientNote
+from app.patients.notes.models import PatientNote, PatientNoteStructured
+from app.patients.notes.soap_parser import parse_soap
 from app.patients.notes.storage import StoredFile
+
+logger = logging.getLogger("app.soap")
 
 
 def _ensure_timezone_aware(dt: datetime) -> datetime:
@@ -24,6 +29,80 @@ def _validate_taken_at_not_future(*, taken_at: datetime) -> None:
     taken_at = _ensure_timezone_aware(taken_at)
     if taken_at > datetime.now(UTC):
         raise BusinessValidationError("taken_at must not be in the future.")
+
+
+async def _maybe_parse_and_persist_soap(
+    *,
+    session: AsyncSession,
+    note: PatientNote,
+    raw_text: str | None,
+) -> None:
+    """
+    Best-effort SOAP parsing + persistence of derived structured data.
+
+    - Only runs when note.note_type == "soap" (case-insensitive).
+    - Never raises to callers (source-of-truth note must be persisted regardless).
+    - Never logs note content or other PHI; warnings include only non-PHI metadata.
+    """
+
+    if (note.note_type or "").strip().lower() != "soap":
+        return
+
+    if not raw_text:
+        logger.warning("SOAP parse skipped: missing raw text (note_id=%s)", str(note.id))
+        return
+
+    try:
+        parsed = parse_soap(raw_text)
+    except Exception as exc:  # noqa: BLE001
+        # Defensive: parse_soap should be pure/deterministic; never block note creation.
+        logger.warning(
+            "SOAP parse failed: parser raised (note_id=%s, error=%s)",
+            str(note.id),
+            exc.__class__.__name__,
+        )
+        return
+
+    if parsed is None:
+        logger.warning("SOAP parse failed: no SOAP markers found (note_id=%s)", str(note.id))
+        return
+
+    if parsed.confidence != "high":
+        # Per requirements: log warning for incomplete parsing.
+        logger.warning(
+            "SOAP parse incomplete (note_id=%s, confidence=%s)", str(note.id), parsed.confidence
+        )
+
+    payload = {
+        "schema": parsed.schema,
+        "parsed_from": parsed.parsed_from,
+        "parser_version": parsed.parser_version,
+        "confidence": parsed.confidence,
+        "sections": parsed.sections,
+    }
+
+    try:
+        row = PatientNoteStructured(
+            id=uuid.uuid4(),
+            note_id=note.id,
+            schema=parsed.schema,
+            parsed_from=parsed.parsed_from,
+            parser_version=parsed.parser_version,
+            confidence=parsed.confidence,
+            data=payload,
+        )
+        session.add(row)
+        await session.commit()
+    except IntegrityError:
+        # Deterministic + idempotent behavior: if the row already exists, do nothing.
+        await session.rollback()
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        logger.warning(
+            "SOAP parse persistence failed (note_id=%s, error=%s)",
+            str(note.id),
+            exc.__class__.__name__,
+        )
 
 
 async def create_inline_patient_note(
@@ -53,6 +132,10 @@ async def create_inline_patient_note(
     session.add(note)
     await session.commit()
     await session.refresh(note)
+
+    # Best-effort derived parsing (non-authoritative, source-of-truth remains content_text).
+    await _maybe_parse_and_persist_soap(session=session, note=note, raw_text=content_text)
+
     return note
 
 
@@ -65,6 +148,7 @@ async def create_file_patient_note(
     note_type: str | None,
     content_mime_type: str,
     stored_file: StoredFile,
+    raw_text_for_parsing: str | None,
 ) -> PatientNote:
     taken_at = _ensure_timezone_aware(taken_at)
     _validate_taken_at_not_future(taken_at=taken_at)
@@ -85,6 +169,10 @@ async def create_file_patient_note(
     session.add(note)
     await session.commit()
     await session.refresh(note)
+
+    # Best-effort derived parsing (non-authoritative, source-of-truth remains the file).
+    await _maybe_parse_and_persist_soap(session=session, note=note, raw_text=raw_text_for_parsing)
+
     return note
 
 

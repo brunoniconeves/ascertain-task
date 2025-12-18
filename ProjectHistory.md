@@ -55,7 +55,32 @@ Indexes: patient_id index + composite (patient_id, taken_at) index for efficient
 
 - Future S3 support: Treat file_path as a storage key (relative path/object key) and keep checksum/size/mime; swapping filesystem→S3 can be done in application storage code without changing this schema.
 
-    
+- Structured note SOAP format
+    - decided to create separate table for structured SOAP files
+    - we try to parse it and if possible we store the JSON structured data
+
+- Decided to add structured data on API get notes return, but with a clear information that it's derived data
+    - Benefits
+
+        - Clients don’t need a second call
+
+        - Structured data is actually usable (that’s why you extracted it)
+
+        - Makes the feature visible and testable in the exam
+
+    - Risks (that we must mitigate)
+
+        - Confusing derived data with source-of-truth
+
+        - Clients assuming it’s always present
+
+        - Clients assuming it’s always correct
+
+        - We solve this with clear API semantics.    
+
+    - When available, derived structured data (e.g. parsed SOAP sections) is returned alongside the raw note. This data is optional, non-authoritative, and explicitly marked as derived.
+
+
 
 
 
