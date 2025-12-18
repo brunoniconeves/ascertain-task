@@ -15,7 +15,7 @@ This was part of a take home task for a Ascertain senior developer role.
   - `POST /patients/{patient_id}/notes`
   - `GET /patients/{patient_id}/notes`
   - `DELETE /patients/{patient_id}/notes/{note_id}`
-  - ``
+  - `GET /patients/{patient_id}/summary`
 
 
 Interactive docs:
@@ -243,7 +243,7 @@ For detailed endpoint (GET /patients{id}/notes/{id})
 We return detailed derived data if available
 
 
-## Why This Design
+### Why This Design
 
 - Preserves clinical and legal integrity
 
@@ -256,6 +256,23 @@ We return detailed derived data if available
 - Reflects real-world healthcare system constraints
 
 In a production system, structured data could later be augmented by OCR or NLP tools, but the clinician-provided note would always remain the authoritative record.
+
+### Future work
+
+Use LLM, OCR and other AI tools to extract content from Images/PDFs to also allow usage of those information on summary endpoint.
+But always remembering to save additional derived information in separate structures, the source of truth should always be the original submitted file.
+
+## Get Patient Summary
+(GET /patients/{id}/summary)
+
+This endpoint go throuth all patient notes (structured SOAP or unstructured text) and use a AI prompt to lavarage a OpenAI API request to get
+patient summary.
+
+It's possible to set 3 parameters:
+- Pacient ID
+- Target Audiency
+- Verbosity (short - medium - long)
+
 
 
 ## Logging & security (HIPAA/LGPD-aware)
