@@ -37,7 +37,8 @@ On container start (in Docker), the API runs seed steps for local development:
   by calling the same API endpoint used by normal clients (`POST /patients/{patient_id}/notes`), so the
   **derived structured SOAP data** is created and persisted as part of the normal ingestion flow.
 
-SOAP seed inputs come from `data/exampleFiles/ai_generated_soap_*.txt` (synthetic examples; no real PHI).
+- SOAP seed inputs come from `data/exampleFiles/ai_generated_soap_*.txt` (synthetic examples; no real PHI).
+ The ai-generated SOAP files were based on the 6 examples provided by Ascertain
 
 ## Local setup (Docker Compose)
 
