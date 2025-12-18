@@ -56,7 +56,19 @@ def _validate_summary_params(
     return cast(SummaryAudience, audience), cast(SummaryVerbosity, verbosity)
 
 
-@router.get("", response_model=PatientListOut)
+@router.get(
+    "",
+    response_model=PatientListOut,
+    summary="List patients",
+    description=(
+        "Return a cursor-paginated list of patients.\n\n"
+        "Privacy note: list items intentionally omit MRN. Use `GET /patients/{patient_id}` for "
+        "MRN and full patient details."
+    ),
+    responses={
+        400: {"description": "Invalid query parameters (e.g. malformed cursor)."},
+    },
+)
 async def get_patients(
     limit: int = Query(default=50, ge=1, le=100),
     cursor: str | None = Query(
@@ -69,8 +81,14 @@ async def get_patients(
         description="Filter by name (case-insensitive substring match). Minimum length: 3.",
     ),
     q: str | None = Query(default=None, min_length=1, include_in_schema=False),
-    sort: PatientSortField | None = Query(default=None),
-    order: SortOrder = Query(default="asc"),
+    sort: PatientSortField | None = Query(
+        default=None,
+        description="Sort field. Defaults to service-defined ordering when omitted.",
+    ),
+    order: SortOrder = Query(
+        default="asc",
+        description="Sort direction.",
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> PatientListOut:
     # Backwards-compatible alias: `q` was the original param name.
@@ -100,7 +118,15 @@ async def get_patients(
     return PatientListOut(items=items_out, limit=limit, next_cursor=next_cursor)
 
 
-@router.get("/{patient_id}", response_model=PatientOut)
+@router.get(
+    "/{patient_id}",
+    response_model=PatientOut,
+    summary="Get patient",
+    description="Fetch a single patient record by id.",
+    responses={
+        404: {"description": "Patient not found."},
+    },
+)
 async def get_patient_by_id(
     patient_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
@@ -111,7 +137,20 @@ async def get_patient_by_id(
     return patient
 
 
-@router.get("/{patient_id}/summary", response_model=PatientSummaryOut)
+@router.get(
+    "/{patient_id}/summary",
+    response_model=PatientSummaryOut,
+    summary="Generate patient summary",
+    description=(
+        "Generate a read-only, non-persistent patient summary based on the patient's notes.\n\n"
+        "Safety: prompts and outputs are never logged or stored by this service."
+    ),
+    responses={
+        400: {"description": "Invalid query parameters (audience/verbosity)."},
+        404: {"description": "Patient not found."},
+        502: {"description": "LLM service unavailable or failed."},
+    },
+)
 async def get_patient_summary(
     patient_id: uuid.UUID,
     request: Request,
@@ -179,7 +218,16 @@ async def get_patient_summary(
     return summary
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=PatientOut)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PatientOut,
+    summary="Create patient",
+    description="Create a patient record. MRN may be provided or server-generated (configurable).",
+    responses={
+        400: {"description": "Business validation failed (e.g. invalid date of birth)."},
+    },
+)
 async def create_patient_route(
     payload: PatientCreate,
     session: AsyncSession = Depends(get_session),
@@ -193,7 +241,16 @@ async def create_patient_route(
     return patient
 
 
-@router.put("/{patient_id}", response_model=PatientOut)
+@router.put(
+    "/{patient_id}",
+    response_model=PatientOut,
+    summary="Update patient",
+    description="Update mutable patient fields (name and date_of_birth). MRN is immutable.",
+    responses={
+        400: {"description": "Business validation failed (e.g. MRN update attempted)."},
+        404: {"description": "Patient not found."},
+    },
+)
 async def update_patient_by_id(
     patient_id: uuid.UUID,
     payload: PatientUpdate,
@@ -212,7 +269,16 @@ async def update_patient_by_id(
     return updated
 
 
-@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/{patient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete patient",
+    description="Delete a patient record.",
+    responses={
+        404: {"description": "Patient not found."},
+    },
+)
 async def delete_patient_by_id(
     patient_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),

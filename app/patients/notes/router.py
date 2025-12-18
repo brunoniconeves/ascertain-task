@@ -131,11 +131,26 @@ def _determine_allowed_mime_type(*, upload, allowed: set[str]) -> str:
     return provided or sniffed or "application/octet-stream"
 
 
-@router.get("", response_model=PatientNoteListOut)
+@router.get(
+    "",
+    response_model=PatientNoteListOut,
+    summary="List notes",
+    description=(
+        "Return a cursor-paginated list of notes for a patient.\n\n"
+        "List items do not include the full derived structured payload. Use "
+        "`GET /patients/{patient_id}/notes/{note_id}` for details."
+    ),
+    responses={
+        400: {"description": "Invalid query parameters (e.g. malformed cursor)."},
+        404: {"description": "Patient not found."},
+    },
+)
 async def list_notes(
     patient_id: uuid.UUID,
-    limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100, description="Maximum number of items to return."),
+    cursor: str | None = Query(
+        default=None, description="Cursor for pagination (use `next_cursor` from previous response)."
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> PatientNoteListOut:
     patient = await get_patient(session=session, patient_id=patient_id)
@@ -158,7 +173,19 @@ async def list_notes(
     )
 
 
-@router.get("/{note_id}", response_model=PatientNoteOut, response_model_exclude_none=False)
+@router.get(
+    "/{note_id}",
+    response_model=PatientNoteOut,
+    response_model_exclude_none=False,
+    summary="Get note",
+    description=(
+        "Fetch a single note.\n\n"
+        "When `structured_data` is present, it is derived (best-effort) and non-authoritative."
+    ),
+    responses={
+        404: {"description": "Patient or note not found."},
+    },
+)
 async def get_note(
     patient_id: uuid.UUID,
     note_id: uuid.UUID,
@@ -186,7 +213,23 @@ async def get_note(
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=PatientNoteOut,
+    summary="Create note",
+    description=(
+        "Create a note for a patient.\n\n"
+        "Supported request types:\n"
+        "- `application/json`: inline text note.\n"
+        "- `multipart/form-data`: upload a file note.\n\n"
+        "Note content is the source of truth; derived structured data (when available) is stored "
+        "separately and marked as non-authoritative."
+    ),
     openapi_extra=_CREATE_NOTE_OPENAPI_EXTRA,
+    responses={
+        400: {"description": "Validation failed (e.g. missing file/taken_at)."},
+        404: {"description": "Patient not found."},
+        413: {"description": "Uploaded file is too large."},
+        415: {"description": "Unsupported media type (must be JSON or multipart/form-data)."},
+        422: {"description": "Payload validation failed."},
+    },
 )
 async def create_patient_note(
     patient_id: uuid.UUID,
@@ -334,7 +377,20 @@ async def create_patient_note(
     )
 
 
-@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/{note_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete note",
+    description=(
+        "Soft-delete a note for auditability, and remove any stored file content so a deleted "
+        "note implies the content is gone."
+    ),
+    responses={
+        404: {"description": "Patient or note not found."},
+        500: {"description": "File deletion/storage backend error."},
+    },
+)
 async def delete_note(
     patient_id: uuid.UUID,
     note_id: uuid.UUID,

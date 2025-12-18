@@ -8,6 +8,7 @@ from fastapi.openapi.docs import get_redoc_html
 from starlette.staticfiles import StaticFiles
 
 from app.api.exception_handlers import register_exception_handlers
+from app.api.schemas import HealthOut
 from app.core.db import close_db, init_db
 from app.core.logging import setup_logging
 from app.core.metrics import PrometheusMetricsMiddleware, metrics_router
@@ -30,9 +31,40 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Healthcare Data Processing API",
+        description=(
+            "API for managing patients and their clinical notes.\n\n"
+            "Design principles:\n"
+            "- Patient notes are stored as the *source of truth* (raw text or uploaded files).\n"
+            "- Any structured data (e.g. derived SOAP sections) is best-effort and "
+            "non-authoritative.\n"
+            "- Logging and metrics avoid PHI/PII by using route templates and metadata only."
+        ),
         lifespan=lifespan,
         docs_url="/swagger",  # Swagger UI ("Try it out")
         redoc_url=None,  # we'll serve a custom ReDoc page at /docs
+        openapi_tags=[
+            {
+                "name": "health",
+                "description": (
+                    "Basic uptime and readiness checks for load balancers and monitoring."
+                ),
+            },
+            {
+                "name": "patients",
+                "description": "Create, read, update and delete patient records.",
+            },
+            {
+                "name": "patient-notes",
+                "description": (
+                    "Manage patient notes (inline text or file uploads). Notes may include "
+                    "optional derived structured data (e.g. SOAP sections) when available."
+                ),
+            },
+            {
+                "name": "metrics",
+                "description": "Prometheus-compatible metrics endpoint.",
+            },
+        ],
     )
 
     app.add_middleware(PrometheusMetricsMiddleware)
@@ -57,9 +89,19 @@ def create_app() -> FastAPI:
             redoc_js_url=redoc_js_url,
         )
 
-    @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    @app.get(
+        "/health",
+        response_model=HealthOut,
+        tags=["health"],
+        summary="Health check",
+        description=(
+            "Lightweight endpoint to verify the API process is running.\n\n"
+            "This endpoint intentionally does not check downstream dependencies (e.g. DB) so it "
+            "can be used safely for basic uptime checks."
+        ),
+    )
+    async def health() -> HealthOut:
+        return HealthOut(status="ok")
 
     app.include_router(metrics_router)
     app.include_router(patients_router)
