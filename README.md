@@ -15,6 +15,7 @@ This was part of a take home task for a Ascertain senior developer role.
   - `POST /patients/{patient_id}/notes`
   - `GET /patients/{patient_id}/notes`
   - `DELETE /patients/{patient_id}/notes/{note_id}`
+  - ``
 
 
 Interactive docs:
@@ -26,10 +27,17 @@ The OpenAPI JSON is available at `GET /openapi.json`.
 
 ## Seed data
 
-On container start, the API runs a small seed step that inserts **15 patients only if**:
+On container start (in Docker), the API runs seed steps for local development:
 
-- `APP_ENV=development`
-- the `patients` table is currently empty
+- **Patients**: inserts **15 patients** only if:
+  - `APP_ENV=development`
+  - the `patients` table is currently empty
+
+- **Patient notes**: after patients exist, it seeds **3 SOAP notes per seeded patient** (total **45 notes**),
+  by calling the same API endpoint used by normal clients (`POST /patients/{patient_id}/notes`), so the
+  **derived structured SOAP data** is created and persisted as part of the normal ingestion flow.
+
+SOAP seed inputs come from `data/exampleFiles/ai_generated_soap_*.txt` (synthetic examples; no real PHI).
 
 ## Local setup (Docker Compose)
 
@@ -43,6 +51,15 @@ cp .env.example .env
 
 ```bash
 docker compose up --build
+```
+
+### Start from scratch (wipe DB + rebuild everything)
+
+If you want a clean database and the seed to run again, remove containers, images, and volumes, then start up:
+
+```bash
+docker compose down --remove-orphans --rmi all -v
+docker compose up -d --build
 ```
 
 3. Verify:

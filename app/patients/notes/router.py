@@ -27,6 +27,47 @@ from app.patients.service import get_patient
 router = APIRouter(prefix="/{patient_id}/notes", tags=["patient-notes"])
 logger = logging.getLogger("app.soap")
 
+_CREATE_NOTE_OPENAPI_EXTRA = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            # Inline note creation
+            "application/json": {
+                "schema": PatientNoteCreateJson.model_json_schema(),
+                "examples": {
+                    "inline_text": {
+                        "summary": "Inline note (text/plain)",
+                        "value": {
+                            "taken_at": "2025-01-01T12:34:56Z",
+                            "note_type": "soap",
+                            "content_text": "S: ...\nO: ...\nA: ...\nP: ...",
+                            "content_mime_type": "text/plain",
+                        },
+                    }
+                },
+            },
+            # File-backed note creation
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["file", "taken_at"],
+                    "properties": {
+                        "file": {"type": "string", "format": "binary"},
+                        "taken_at": {"type": "string", "format": "date-time"},
+                        "note_type": {"type": "string", "nullable": True},
+                    },
+                },
+                "examples": {
+                    "upload_file": {
+                        "summary": "Upload a note file",
+                        "value": {"taken_at": "2025-01-01T12:34:56Z", "note_type": "soap"},
+                    }
+                },
+            },
+        },
+    }
+}
+
 
 def _sniff_mime_type(upload) -> str | None:
     """
@@ -141,7 +182,12 @@ async def get_note(
     return PatientNoteOut.model_validate(note)
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=PatientNoteOut)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PatientNoteOut,
+    openapi_extra=_CREATE_NOTE_OPENAPI_EXTRA,
+)
 async def create_patient_note(
     patient_id: uuid.UUID,
     request: Request,

@@ -35,5 +35,3 @@ def decode_note_cursor(*, raw: str) -> NoteCursor:
         )
     except Exception as exc:  # noqa: BLE001
         raise ValueError("Invalid cursor") from exc
-
-
