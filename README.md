@@ -81,6 +81,23 @@ Commands:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
 ```
 
+### Optional: Prometheus for local monitoring demo
+
+Start API + DB + Prometheus:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
+```
+
+Prometheus UI:
+
+- `http://localhost:9090`
+
+Try a couple of queries:
+
+- `http_requests_total`
+- `rate(http_requests_total[1m])`
+
 ### Start from scratch (wipe DB + rebuild everything)
 
 If you want a clean database and the seed to run again, remove containers, images, and volumes, then start up:
