@@ -19,10 +19,11 @@ setup_logging()
 
 
 def create_app() -> FastAPI:
-    settings = get_settings()
-
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Defer settings/env access until application startup.
+        # This avoids requiring DATABASE_URL at import time (e.g. during pytest collection in CI).
+        settings = get_settings()
         init_db(app=app, database_url=str(settings.database_url))
         yield
         await close_db(app=app)
