@@ -76,6 +76,20 @@ class Settings(BaseSettings):
         description="Soft cap for prompt size to reduce risk of overlong requests.",
     )
 
+    # Patient MRN (Medical Record Number)
+    # MRN is a domain identifier (PHI-adjacent). Do not log it.
+    patient_mrn_auto_generate: bool = Field(
+        # With DB-level NOT NULL MRN, create must always provide or generate an MRN.
+        default=True,
+        validation_alias=AliasChoices("PATIENT_MRN_AUTO_GENERATE", "patient_mrn_auto_generate"),
+        description="If true, generate an MRN on patient creation when not provided.",
+    )
+    patient_mrn_prefix: str = Field(
+        default="MRN-",
+        validation_alias=AliasChoices("PATIENT_MRN_PREFIX", "patient_mrn_prefix"),
+        description="Prefix used for generated MRNs.",
+    )
+
     @property
     def notes_base_dir(self) -> str:
         # Backwards-compatible alias used by earlier code.

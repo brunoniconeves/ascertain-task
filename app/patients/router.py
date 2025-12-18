@@ -13,6 +13,7 @@ from app.core.llm.openai_client import OpenAIError
 from app.patients.notes.router import router as patient_notes_router
 from app.patients.schemas import (
     PatientCreate,
+    PatientListItemOut,
     PatientListOut,
     PatientOut,
     PatientSortField,
@@ -95,7 +96,7 @@ async def get_patients(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    items_out = [PatientOut.model_validate(p) for p in items]
+    items_out = [PatientListItemOut.model_validate(p) for p in items]
     return PatientListOut(items=items_out, limit=limit, next_cursor=next_cursor)
 
 
@@ -187,7 +188,10 @@ async def create_patient_route(
     session: AsyncSession = Depends(get_session),
 ) -> PatientOut:
     patient = await create_patient(
-        session=session, name=payload.name, date_of_birth=payload.date_of_birth
+        session=session,
+        name=payload.name,
+        date_of_birth=payload.date_of_birth,
+        mrn=payload.mrn,
     )
     return patient
 
@@ -206,6 +210,7 @@ async def update_patient_by_id(
         patient=patient,
         name=payload.name,
         date_of_birth=payload.date_of_birth,
+        mrn=payload.mrn,
     )
     return updated
 

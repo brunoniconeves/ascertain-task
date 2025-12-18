@@ -13,6 +13,11 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # MRN (Medical Record Number) is a *domain identifier* (not a technical primary key).
+    # - Nullable for backward compatibility (existing patients)
+    # - Unique within the system
+    # - Immutable once set (enforced in service layer + DB trigger in migration where possible)
+    mrn: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False, index=True)
 

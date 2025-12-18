@@ -53,7 +53,7 @@ def test_get_patient_summary_success(summary_client: TestClient) -> None:
 
     payload = res.json()
     assert payload["patient_heading"]["name"] == "Ada Lovelace"
-    assert payload["patient_heading"]["mrn"] is None
+    assert payload["patient_heading"]["mrn"].startswith("MRN-")
     assert payload["patient_heading"]["age"] == _expected_age(dob=date(1990, 12, 10))
 
     assert payload["summary"]["audience"] == "clinician"

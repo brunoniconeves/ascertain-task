@@ -90,7 +90,7 @@ class PatientSummaryService:
         heading = PatientHeading(
             name=patient.name,
             age=_calculate_age(date_of_birth=patient.date_of_birth),
-            mrn=None,  # MRN not currently stored in this codebase; keep nullable for forward-compat.
+            mrn=patient.mrn,
         )
 
         stmt = (
@@ -123,8 +123,9 @@ class PatientSummaryService:
             notes=notes_for_prompt, max_prompt_chars=int(settings.openai_max_prompt_chars)
         )
 
-        # Only send minimal patient context; avoid unnecessary PHI like full DOB.
-        patient_context = {"age_years": heading.age, "mrn": heading.mrn}
+        # Only send minimal patient context; avoid unnecessary PHI / PHI-adjacent fields.
+        # MRN is returned by the API heading, but it's not needed for summary generation.
+        patient_context = {"age_years": heading.age}
 
         system_prompt, user_prompt = build_patient_summary_prompts(
             audience=audience,

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
+import secrets
 import uuid
 from datetime import date
 
 from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.domain.exceptions import BusinessValidationError
 from app.patients.cursor_pagination import (
     decode_patient_cursor,
@@ -121,14 +125,100 @@ async def get_patient(*, session: AsyncSession, patient_id: uuid.UUID) -> Patien
     return await session.get(Patient, patient_id)
 
 
-async def create_patient(*, session: AsyncSession, name: str, date_of_birth: date) -> Patient:
+def _normalize_mrn(*, mrn: str) -> str:
+    # Normalize whitespace; do not alter case (caller may depend on exact casing).
+    normalized = mrn.strip()
+    if not normalized:
+        raise BusinessValidationError("MRN must not be empty.")
+    if len(normalized) > 50:
+        raise BusinessValidationError("MRN must be 50 characters or fewer.")
+    # Keep character set conservative. We avoid spaces and punctuation to reduce downstream issues.
+    # This does NOT encode PHI; it's only format validation.
+    for ch in normalized:
+        if not (ch.isalnum() or ch == "-"):
+            raise BusinessValidationError("MRN contains invalid characters.")
+    return normalized
+
+
+def _generate_mrn(*, prefix: str) -> str:
+    """
+    Generate an opaque MRN with deterministic *format*.
+
+    Strategy:
+    - Prefix (default: "MRN-") + 13 chars of Base32 (RFC4648) derived from 64 bits of randomness.
+    - Does not encode PHI (no DOB/name hashing).
+    - Collision-safe in practice; uniqueness is enforced by a DB unique index, and we retry on
+      conflict.
+    """
+
+    token = base64.b32encode(secrets.token_bytes(8)).decode("ascii").rstrip("=")  # 13 chars
+    return f"{prefix}{token}"
+
+
+async def _mrn_exists(*, session: AsyncSession, mrn: str) -> bool:
+    stmt = select(Patient.id).where(Patient.mrn == mrn).limit(1)
+    row = (await session.execute(stmt)).first()
+    return row is not None
+
+
+async def _generate_unique_mrn(*, session: AsyncSession) -> str:
+    settings = get_settings()
+    prefix = settings.patient_mrn_prefix
+    # Retry loop is a belt-and-suspenders approach: DB uniqueness is the source of truth.
+    for _ in range(5):
+        candidate = _generate_mrn(prefix=prefix)
+        if not await _mrn_exists(session=session, mrn=candidate):
+            return candidate
+    # Extremely unlikely unless DB is unhealthy or uniqueness checks are racing heavily.
+    raise BusinessValidationError("Unable to generate MRN at this time.")
+
+
+async def create_patient(
+    *,
+    session: AsyncSession,
+    name: str,
+    date_of_birth: date,
+    mrn: str | None = None,
+) -> Patient:
     _validate_date_of_birth(date_of_birth=date_of_birth)
 
-    patient = Patient(name=name, date_of_birth=date_of_birth)
-    session.add(patient)
-    await session.commit()
-    await session.refresh(patient)
-    return patient
+    settings = get_settings()
+    normalized_mrn: str | None = None
+    if mrn is not None:
+        normalized_mrn = _normalize_mrn(mrn=mrn)
+        if await _mrn_exists(session=session, mrn=normalized_mrn):
+            # Do not include MRN in the message (PHI-adjacent).
+            raise BusinessValidationError("MRN is already in use.")
+    else:
+        if not settings.patient_mrn_auto_generate:
+            # DB enforces NOT NULL; keep this as a business error rather than a DB error.
+            raise BusinessValidationError("MRN is required.")
+        normalized_mrn = await _generate_unique_mrn(session=session)
+
+    # If MRN is auto-generated, a rare race/collision can still happen at commit.
+    # We retry generation on IntegrityError without exposing the MRN.
+    for _attempt in range(5):
+        patient = Patient(name=name, date_of_birth=date_of_birth, mrn=normalized_mrn)
+        session.add(patient)
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            if mrn is not None:
+                # Client-provided MRN conflict (or other constraint issue). Don't leak details.
+                raise BusinessValidationError("MRN is already in use.") from None
+            if not settings.patient_mrn_auto_generate:
+                raise BusinessValidationError(
+                    "Patient could not be created due to a data conflict."
+                ) from None
+            # Regenerate and retry.
+            normalized_mrn = await _generate_unique_mrn(session=session)
+            continue
+
+        await session.refresh(patient)
+        return patient
+
+    raise BusinessValidationError("Unable to generate MRN at this time.")
 
 
 async def update_patient(
@@ -137,7 +227,12 @@ async def update_patient(
     patient: Patient,
     name: str | None,
     date_of_birth: date | None,
+    mrn: str | None = None,
 ) -> Patient:
+    if mrn is not None:
+        # MRN is immutable via API to preserve clinical identifier integrity.
+        raise BusinessValidationError("MRN cannot be updated.")
+
     if name is not None:
         patient.name = name
     if date_of_birth is not None:

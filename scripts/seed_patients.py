@@ -10,6 +10,7 @@ This script is designed to be safe to run multiple times:
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import uuid
 from datetime import date
@@ -18,6 +19,20 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.patients.models import Patient
+
+
+def _mrn_for_seed_patient(*, patient_id: uuid.UUID) -> str:
+    """
+    Deterministic, opaque MRN for local dev seed data.
+
+    Design:
+    - Format is deterministic (MRN-<BASE32>).
+    - Does NOT encode PHI (not derived from name/DOB); derived from the stable UUID instead.
+    - Collision-safe for this dataset because patient UUIDs are unique.
+    """
+
+    token = base64.b32encode(patient_id.bytes).decode("ascii").rstrip("=")  # 26 chars
+    return f"MRN-{token}"
 
 
 def _seed_rows() -> list[dict]:
@@ -42,7 +57,18 @@ def _seed_rows() -> list[dict]:
         ("Bjarne Stroustrup", date(1950, 12, 30)),
     ]
 
-    return [{"id": uuid.uuid5(ns, name), "name": name, "date_of_birth": dob} for name, dob in rows]
+    out: list[dict] = []
+    for name, dob in rows:
+        patient_id = uuid.uuid5(ns, name)
+        out.append(
+            {
+                "id": patient_id,
+                "name": name,
+                "date_of_birth": dob,
+                "mrn": _mrn_for_seed_patient(patient_id=patient_id),
+            }
+        )
+    return out
 
 
 async def seed_patients_if_empty(*, database_url: str) -> None:
