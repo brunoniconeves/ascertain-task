@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.exceptions import BusinessValidationError
 from app.patients.models import Patient
@@ -208,6 +209,8 @@ async def list_patient_notes(
     stmt = select(PatientNote).where(
         PatientNote.patient_id == patient_id, PatientNote.deleted_at.is_(None)
     )
+    # Prefetch derived structured rows efficiently to avoid per-note queries (N+1).
+    stmt = stmt.options(selectinload(PatientNote.structured))
     stmt = stmt.order_by(PatientNote.taken_at.desc(), PatientNote.id.desc())
     stmt = _apply_notes_cursor(stmt=stmt, patient_id=patient_id, cursor=cursor)
     stmt = stmt.limit(limit + 1)
@@ -241,6 +244,8 @@ async def get_patient_note(
         PatientNote.patient_id == patient_id,
         PatientNote.deleted_at.is_(None),
     )
+    # Prefetch derived structured rows (optional) without forcing parsing at read time.
+    stmt = stmt.options(selectinload(PatientNote.structured))
     return (await session.execute(stmt)).scalars().first()
 
 

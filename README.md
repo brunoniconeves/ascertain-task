@@ -159,15 +159,13 @@ When available, derived structured data (e.g. parsed SOAP sections) is returned 
 ### Pagination endpoint vs single-note endpoint
 For list endpoint (GET /patients/{id}/notes)
 
-Returning structured data is OK because:
+We do not return structured data because:
 
-- Notes are short
+- Structured data is bigger
 
-- Structured data is small
+For detailed endpoint (GET /patients{id}/notes/{id})
 
-- This is a take-home, not a high-traffic prod system
-
-- If this were production-scale we might add ?include_structured=true or only return structured data on detail endpoints
+We return detailed derived data if available
 
 
 ## Why This Design

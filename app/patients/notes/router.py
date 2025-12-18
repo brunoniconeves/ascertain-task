@@ -109,10 +109,36 @@ async def list_notes(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return PatientNoteListOut(
-        items=[PatientNoteOut.model_validate(n) for n in items],
+        # List items intentionally do not embed the full derived structured payload.
+        # Instead they include `has_structured_data`; callers can fetch details via GET /{note_id}.
+        items=[PatientNoteListOut.PatientNoteListItemOut.model_validate(n) for n in items],
         limit=limit,
         next_cursor=next_cursor,
     )
+
+
+@router.get("/{note_id}", response_model=PatientNoteOut, response_model_exclude_none=False)
+async def get_note(
+    patient_id: uuid.UUID,
+    note_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> PatientNoteOut:
+    """
+    Fetch a single note.
+
+    Response is backwards-compatible and includes optional derived structured data
+    (non-authoritative) when it exists; otherwise `structured_data` is null.
+    """
+
+    patient = await get_patient(session=session, patient_id=patient_id)
+    if patient is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    note = await get_patient_note(session=session, patient_id=patient_id, note_id=note_id)
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    return PatientNoteOut.model_validate(note)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=PatientNoteOut)

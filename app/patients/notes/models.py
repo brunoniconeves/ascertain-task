@@ -108,6 +108,49 @@ class PatientNote(Base):
         return self.file_path is not None
 
     @property
+    def structured_data(self) -> dict | None:
+        """
+        Optional derived structured data for API responses.
+
+        Notes on semantics (healthcare safety):
+        - Optional: if no derived rows exist, return None (serialized as `structured_data: null`).
+        - Derived + non-authoritative: the raw note content remains the clinical source of truth.
+        - Never computed at read time: this only reflects persisted `PatientNoteStructured` rows.
+        """
+
+        if not self.structured:
+            return None
+
+        # The table allows multiple schemas per note over time; the API exposes a single
+        # best candidate. Prefer the most recently updated row to avoid surprising callers.
+        best = max(self.structured, key=lambda r: (r.updated_at, r.created_at))
+        payload = best.data or {}
+
+        schema = payload.get("schema") if isinstance(payload, dict) else None
+        sections = None
+        if isinstance(payload, dict):
+            sections = payload.get("sections")
+
+        # Keep the response contract stable and minimal: schema + derived marker + sections.
+        sections_dict = sections if isinstance(sections, dict) else {}
+        return {
+            "schema": schema or best.schema,
+            "derived": True,
+            "sections": sections_dict,
+        }
+
+    @property
+    def has_structured_data(self) -> bool:
+        """
+        True if this note has any persisted derived structured rows.
+
+        This is safe for list endpoints: it is a cheap boolean derived from already-loaded
+        ORM relationships (prefetched via selectinload) and does not parse/infer anything.
+        """
+
+        return bool(self.structured)
+
+    @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
 

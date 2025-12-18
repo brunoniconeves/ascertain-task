@@ -70,3 +70,27 @@ def test_delete_patient_note_soft_deletes_and_cleans_up_file(client: TestClient,
     assert not any(p.is_file() for p in note_dir.rglob("*"))
 
 
+def test_list_patient_notes_includes_has_structured_data_flag_but_not_payload(
+    client: TestClient,
+) -> None:
+    patient_id = create_patient(client=client, name="List Structured Flag", date_of_birth="1990-01-01")
+    taken_at = datetime.now(timezone.utc).isoformat()
+
+    # Create a SOAP note so derived structured data is persisted at write time.
+    soap_text = "S: subj\nO: obj\nA: assess\nP: plan"
+    created = client.post(
+        f"/patients/{patient_id}/notes",
+        json={"taken_at": taken_at, "note_type": "soap", "content_text": soap_text},
+    )
+    assert created.status_code == 201, created.text
+    note_id = created.json()["id"]
+
+    listed = client.get(f"/patients/{patient_id}/notes?limit=10")
+    assert listed.status_code == 200, listed.text
+    items = listed.json()["items"]
+    assert any(i["id"] == note_id for i in items)
+
+    item = next(i for i in items if i["id"] == note_id)
+    assert item["has_structured_data"] is True
+    assert "structured_data" not in item
+
