@@ -209,6 +209,10 @@ If parsing succeeds, structured data is stored as derived metadata. If parsing f
   <img src="docs/diagrams/note-flow-diagram.png" alt="SOAP Note Ingestion Flow" width="700"/>
 </p>
 
+> IMPORTANT: notes are stored on the local storage path defined on .env NOTES_BASE_DIR config
+
+For production the decison would be to store the files on S3 bucket with proper encryption policies.
+
 
 ## Structured Data Storage
 
@@ -267,6 +271,8 @@ But always remembering to save additional derived information in separate struct
 
 This endpoint go throuth all patient notes (structured SOAP or unstructured text) and use a AI prompt to lavarage a OpenAI API request to get
 patient summary.
+
+> IMPORTANT: you should configure a valid OPEN AI API KEY in the .env file.
 
 It's possible to set 3 parameters:
 - Pacient ID
