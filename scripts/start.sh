@@ -4,6 +4,9 @@ set -eu
 cd /app
 export PYTHONPATH="/app"
 
+# Runtime environment: development|production
+APP_ENV="${APP_ENV:-production}"
+
 # Try to ensure ReDoc JS is available locally (avoids blank docs when CDN is blocked).
 REDOC_JS_PATH="/app/app/static/redoc.standalone.js"
 if [ ! -f "$REDOC_JS_PATH" ]; then
@@ -62,17 +65,23 @@ PY
 echo "Running migrations..."
 alembic upgrade head
 
-echo "Seeding patients (only if empty)..."
-python /app/scripts/seed_patients.py
+if [ "$APP_ENV" = "development" ]; then
+  echo "Seeding patients (development only; only if empty)..."
+  python /app/scripts/seed_patients.py
+else
+  echo "Skipping seed: APP_ENV=${APP_ENV} (seeding disabled outside development)."
+fi
 
 echo "Starting API..."
 uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 API_PID="$!"
 
-echo "Seeding notes (3 SOAP notes per seeded patient)..."
-# Use localhost from inside the container.
-API_BASE_URL="http://127.0.0.1:8000" EXAMPLES_DIR="/app/data/exampleFiles" /app/scripts/seed_patient_notes.sh || \
-  echo "Warning: note seeding failed (API will still start)."
+if [ "$APP_ENV" = "development" ]; then
+  echo "Seeding notes (development only; 3 SOAP notes per seeded patient)..."
+  # Use localhost from inside the container.
+  API_BASE_URL="http://127.0.0.1:8000" EXAMPLES_DIR="/app/data/exampleFiles" /app/scripts/seed_patient_notes.sh || \
+    echo "Warning: note seeding failed (API will still start)."
+fi
 
 wait "$API_PID"
 

@@ -30,7 +30,7 @@ The OpenAPI JSON is available at `GET /openapi.json`.
 On container start (in Docker), the API runs seed steps for local development:
 
 - **Patients**: inserts **15 patients** only if:
-  - `APP_ENV=development`
+  - `APP_ENV=development` (set by default in `docker-compose.override.yml`)
   - the `patients` table is currently empty
 
 - **Patient notes**: after patients exist, it seeds **3 SOAP notes per seeded patient** (total **45 notes**),
@@ -52,6 +52,33 @@ cp .env.example .env
 
 ```bash
 docker compose up --build
+```
+
+### Dev vs prod mode (Compose layering)
+
+By default, `docker compose up` will load:
+
+- `docker-compose.yml` (base)
+- `docker-compose.override.yml` (dev defaults)
+
+**Development (default):**
+
+- Seeds run (idempotent) because `APP_ENV=development`
+- API bind-mounts the repo into the container for fast iteration
+- Logging defaults to `DEBUG` (overrideable via `LOG_LEVEL`)
+
+Commands:
+
+```bash
+docker compose up --build
+```
+
+**Production-like (no bind mount, no seeding):**
+
+Commands:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
 ```
 
 ### Start from scratch (wipe DB + rebuild everything)
@@ -222,7 +249,7 @@ What is logged (metadata only):
 
 - `request_id` (correlation id via `X-Request-ID`)
 - HTTP method
-- request path (**no query string**)
+- request route template (e.g. `/patients/{patient_id}`; never the raw URL path)
 - response status code
 - request duration (ms)
 
@@ -258,6 +285,7 @@ alembic upgrade head
 
 ```bash
 python -m pip install -r requirements.txt -r requirements-dev.txt
+export PYTHONPATH=.
 pytest -q
 ```
 
@@ -269,3 +297,33 @@ Ruff is configured as the formatter and linter.
 ruff format .
 ruff check --fix .
 ```
+
+## Monitoring (Prometheus metrics)
+
+The API exposes a Prometheus-compatible endpoint at `GET /metrics`.
+
+Local check:
+
+```bash
+curl -s localhost:8000/metrics | head
+```
+
+Safety:
+
+- Metrics use **route templates** (e.g. `/patients/{patient_id}`) or `"unmatched"` and never include raw paths or identifiers.
+- Do not add patient IDs / MRNs / note contents as metric labels.
+
+## CI (GitHub Actions)
+
+CI runs on pushes to `main` and on pull requests, and performs:
+
+- `ruff format --check` (changed Python files only)
+- `ruff check --no-fix` (changed Python files only)
+- `pytest -q`
+
+It installs dependencies directly (not Docker-build) to keep CI fast and aligned with the SQLite-based unit tests.
+
+## Environment variables
+
+- **`APP_ENV`**: `development|production` (seeding runs only in development; default dev is set by Compose override)
+- **`LOG_LEVEL`**: logging level override (defaults to `DEBUG` in development, `INFO` otherwise)

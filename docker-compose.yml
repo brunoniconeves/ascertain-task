@@ -18,8 +18,6 @@ services:
       - db
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
 
 volumes:
   postgres_data:

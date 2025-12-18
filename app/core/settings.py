@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "ascertain-task"
+    app_env: str = Field(
+        default="production",
+        validation_alias=AliasChoices("APP_ENV", "app_env"),
+        description="Runtime environment: development|production.",
+    )
     database_url: str = Field(
         description="SQLAlchemy DB URL (e.g. postgresql+asyncpg://user:pass@host:5432/db)"
     )
@@ -26,8 +31,14 @@ class Settings(BaseSettings):
     )
     local_storage_base_path: str = Field(
         default="./data/notes",
-        validation_alias=AliasChoices("LOCAL_STORAGE_BASE_PATH", "NOTES_BASE_DIR", "local_storage_base_path"),
-        description="Base directory where file-based patient notes are stored (relative or absolute).",
+        validation_alias=AliasChoices(
+            "LOCAL_STORAGE_BASE_PATH",
+            "NOTES_BASE_DIR",
+            "local_storage_base_path",
+        ),
+        description=(
+            "Base directory where file-based patient notes are stored (relative or absolute)."
+        ),
     )
     max_note_upload_mb: int = Field(
         default=5,
@@ -42,7 +53,10 @@ class Settings(BaseSettings):
             "image/png",
             "image/jpeg",
         ],
-        validation_alias=AliasChoices("NOTES_ALLOWED_MIME_TYPES", "notes_allowed_mime_types"),
+        validation_alias=AliasChoices(
+            "NOTES_ALLOWED_MIME_TYPES",
+            "notes_allowed_mime_types",
+        ),
         description="Allowlist of MIME types accepted for note uploads.",
     )
 
@@ -99,6 +113,10 @@ class Settings(BaseSettings):
     def notes_max_upload_bytes(self) -> int:
         # Backwards-compatible alias used by earlier code.
         return int(self.max_note_upload_mb) * 1024 * 1024
+
+    @property
+    def is_development(self) -> bool:
+        return str(self.app_env).strip().lower() == "development"
 
 
 @lru_cache

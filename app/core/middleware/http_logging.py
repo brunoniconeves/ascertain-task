@@ -36,6 +36,21 @@ def _get_or_create_request_id(*, request: Request) -> str:
     return uuid.uuid4().hex
 
 
+def _safe_route_label(*, request: Request) -> str:
+    """
+    Return a safe path label for logs.
+
+    Prefer the framework's route template (e.g. /patients/{patient_id}) to avoid
+    logging identifiers present in raw URLs.
+    """
+
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    if isinstance(path, str) and path:
+        return path
+    return "unmatched"
+
+
 class HttpLoggingMiddleware(BaseHTTPMiddleware):
     """Log request/response metadata and propagate a correlation id.
 
@@ -56,12 +71,13 @@ class HttpLoggingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception:  # noqa: BLE001 - we must log unexpected exceptions with stack trace
             duration_ms = (time.perf_counter() - started) * 1000.0
+            safe_path = _safe_route_label(request=request)
             logger.exception(
                 "Unhandled exception while processing request",
                 extra={
                     "request_id": request_id,
                     "http_method": request.method,
-                    "request_path": request.url.path,  # no query string
+                    "request_path": safe_path,
                     "status_code": 500,
                     "duration_ms": round(duration_ms, 2),
                 },
@@ -69,6 +85,7 @@ class HttpLoggingMiddleware(BaseHTTPMiddleware):
             raise
 
         duration_ms = (time.perf_counter() - started) * 1000.0
+        safe_path = _safe_route_label(request=request)
 
         # Ensure correlation id is present on all responses.
         response.headers[_REQUEST_ID_HEADER] = request_id
@@ -78,7 +95,7 @@ class HttpLoggingMiddleware(BaseHTTPMiddleware):
             extra={
                 "request_id": request_id,
                 "http_method": request.method,
-                "request_path": request.url.path,  # no query string
+                "request_path": safe_path,
                 "status_code": response.status_code,
                 "duration_ms": round(duration_ms, 2),
             },

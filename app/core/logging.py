@@ -15,8 +15,9 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+_app_env = os.getenv("APP_ENV", "production").strip().lower()
+_default_log_level = "DEBUG" if _app_env == "development" else "INFO"
+LOG_LEVEL = os.getenv("LOG_LEVEL", _default_log_level).upper()
 
 
 class JsonFormatter(logging.Formatter):
@@ -38,8 +39,7 @@ class JsonFormatter(logging.Formatter):
             "path": getattr(record, "path", getattr(record, "request_path", None)),
             "status_code": getattr(record, "status_code", None),
             "duration_ms": getattr(record, "duration_ms", None),
-            # Optional domain metadata (safe for correlation; should not include PHI beyond ids)
-            "patient_id": getattr(record, "patient_id", None),
+            # Optional domain metadata (must not include PHI / identifiers)
             "audience": getattr(record, "audience", None),
             "verbosity": getattr(record, "verbosity", None),
             "success": getattr(record, "success", None),
@@ -82,5 +82,3 @@ def setup_logging() -> None:
             },
         }
     )
-
-

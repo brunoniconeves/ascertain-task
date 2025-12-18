@@ -136,7 +136,6 @@ async def get_patient_summary(
             "Patient summary failed (LLM not configured)",
             extra={
                 "request_id": request_id,
-                "patient_id": str(patient_id),
                 "audience": aud,
                 "verbosity": verb,
                 "success": False,
@@ -158,7 +157,6 @@ async def get_patient_summary(
             "Patient summary failed",
             extra={
                 "request_id": request_id,
-                "patient_id": str(patient_id),
                 "audience": aud,
                 "verbosity": verb,
                 "success": False,
@@ -173,7 +171,6 @@ async def get_patient_summary(
         "Patient summary generated",
         extra={
             "request_id": request_id,
-            "patient_id": str(patient_id),
             "audience": aud,
             "verbosity": verb,
             "success": True,

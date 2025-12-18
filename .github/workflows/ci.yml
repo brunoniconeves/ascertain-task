@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Compute changed Python files
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            # Fallback: run on all Python files (should be rare).
+            FILES="$(git ls-files | grep -E '\.py$' || true)"
+          else
+            FILES="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}" | grep -E '\.py$' || true)"
+          fi
+
+          {
+            echo "CHANGED_PY_FILES<<EOF"
+            echo "${FILES}"
+            echo "EOF"
+          } >> "${GITHUB_ENV}"
+
+      - name: Ruff format (check changed files)
+        shell: bash
+        run: |
+          if [[ -z "${CHANGED_PY_FILES}" ]]; then
+            echo "No Python files changed; skipping ruff format check."
+            exit 0
+          fi
+          echo "${CHANGED_PY_FILES}" | xargs ruff format --check
+
+      - name: Ruff lint (changed files)
+        shell: bash
+        run: |
+          if [[ -z "${CHANGED_PY_FILES}" ]]; then
+            echo "No Python files changed; skipping ruff lint."
+            exit 0
+          fi
+          # Avoid modifying files in CI.
+          echo "${CHANGED_PY_FILES}" | xargs ruff check --no-fix
+
+      - name: Pytest
+        run: pytest -q
+
+

@@ -10,6 +10,7 @@ from starlette.staticfiles import StaticFiles
 from app.api.exception_handlers import register_exception_handlers
 from app.core.db import close_db, init_db
 from app.core.logging import setup_logging
+from app.core.metrics import PrometheusMetricsMiddleware, metrics_router
 from app.core.middleware.http_logging import HttpLoggingMiddleware
 from app.core.settings import get_settings
 from app.patients.router import router as patients_router
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
         redoc_url=None,  # we'll serve a custom ReDoc page at /docs
     )
 
+    app.add_middleware(PrometheusMetricsMiddleware)
     app.add_middleware(HttpLoggingMiddleware)
 
     register_exception_handlers(app)
@@ -58,6 +60,7 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.include_router(metrics_router)
     app.include_router(patients_router)
     return app
 
