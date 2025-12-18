@@ -28,6 +28,7 @@ def _create_test_schema(database_url: str) -> None:
     async def run() -> None:
         # Ensure all model modules are imported so Base.metadata is populated.
         from app.patients import models as _patients_models  # noqa: F401
+        from app.patients.notes import models as _patient_notes_models  # noqa: F401
 
         engine = create_engine(database_url=database_url)
         async with engine.begin() as conn:

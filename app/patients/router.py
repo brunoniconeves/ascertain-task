@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.patients.notes.router import router as patient_notes_router
 from app.patients.schemas import (
     PatientCreate,
     PatientListOut,
@@ -23,6 +24,7 @@ from app.patients.service import (
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
+router.include_router(patient_notes_router)
 
 
 @router.get("", response_model=PatientListOut)

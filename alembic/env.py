@@ -13,6 +13,7 @@ from app.core.db import Base
 
 # Ensure models are registered on Base.metadata
 from app.patients import models as _patients_models  # noqa: F401
+from app.patients.notes import models as _patient_notes_models  # noqa: F401
 
 config = context.config
 

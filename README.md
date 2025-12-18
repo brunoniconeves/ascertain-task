@@ -1,16 +1,21 @@
 # ascertain-task
 
-FastAPI + Postgres backend for storing and retrieving patient medical records.
+FastAPI + Postgres backend for storing and retrieving patient medical records, notes and summary generation.
+This was part of a take home task for a Ascertain senior developer role.
 
-## Part 1 scope
+## API endpoints
 
 - `GET /health` returns `{"status": "ok"}`
 - Patient CRUD:
   - `GET /patients` (paging + optional sorting/filtering)
-  - `GET /patients/{id}`
+  - `GET /patients/{patient_id}`
   - `POST /patients`
-  - `PUT /patients/{id}`
-  - `DELETE /patients/{id}`
+  - `PUT /patients/{patient_id}`
+  - `DELETE /patients/{patient_id}`
+  - `POST /patients/{patient_id}/notes`
+  - `GET /patients/{patient_id}/notes`
+  - `DELETE /patients/{patient_id}/notes/{note_id}`
+
 
 Interactive docs:
 
