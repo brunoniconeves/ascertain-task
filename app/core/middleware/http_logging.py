@@ -48,6 +48,9 @@ class HttpLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = _get_or_create_request_id(request=request)
         started = time.perf_counter()
+        # Make request_id available to downstream handlers/services for safe correlation logging.
+        # This avoids re-generating IDs or reading query/body data for correlation.
+        request.state.request_id = request_id
 
         try:
             response = await call_next(request)

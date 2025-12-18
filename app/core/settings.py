@@ -46,6 +46,36 @@ class Settings(BaseSettings):
         description="Allowlist of MIME types accepted for note uploads.",
     )
 
+    # LLM integration (OpenAI)
+    # IMPORTANT (healthcare safety): keep configuration explicit and avoid implicit logging.
+    openai_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
+        description="OpenAI API key (required for /patients/{id}/summary).",
+    )
+    openai_model: str = Field(
+        default="gpt-4o-mini",
+        validation_alias=AliasChoices("OPENAI_MODEL", "openai_model"),
+        description="OpenAI model identifier used for summary generation.",
+    )
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        validation_alias=AliasChoices("OPENAI_BASE_URL", "openai_base_url"),
+        description="Base URL for OpenAI API (override for proxies/emulators).",
+    )
+    openai_timeout_seconds: float = Field(
+        default=30.0,
+        ge=1.0,
+        validation_alias=AliasChoices("OPENAI_TIMEOUT_SECONDS", "openai_timeout_seconds"),
+        description="Timeout for OpenAI API requests (seconds).",
+    )
+    openai_max_prompt_chars: int = Field(
+        default=60_000,
+        ge=1_000,
+        validation_alias=AliasChoices("OPENAI_MAX_PROMPT_CHARS", "openai_max_prompt_chars"),
+        description="Soft cap for prompt size to reduce risk of overlong requests.",
+    )
+
     @property
     def notes_base_dir(self) -> str:
         # Backwards-compatible alias used by earlier code.

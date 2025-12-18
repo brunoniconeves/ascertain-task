@@ -38,6 +38,11 @@ class JsonFormatter(logging.Formatter):
             "path": getattr(record, "path", getattr(record, "request_path", None)),
             "status_code": getattr(record, "status_code", None),
             "duration_ms": getattr(record, "duration_ms", None),
+            # Optional domain metadata (safe for correlation; should not include PHI beyond ids)
+            "patient_id": getattr(record, "patient_id", None),
+            "audience": getattr(record, "audience", None),
+            "verbosity": getattr(record, "verbosity", None),
+            "success": getattr(record, "success", None),
         }
 
         if record.exc_info:
@@ -64,6 +69,12 @@ def setup_logging() -> None:
                     "formatter": "json",
                     "stream": "ext://sys.stdout",
                 }
+            },
+            # Reduce noise from third-party libraries; avoid accidental logging of sensitive data.
+            "loggers": {
+                # httpx can log request lines at INFO; we don't want that in a healthcare app.
+                "httpx": {"level": "WARNING"},
+                "httpcore": {"level": "WARNING"},
             },
             "root": {
                 "level": LOG_LEVEL,

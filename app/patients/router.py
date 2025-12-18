@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import uuid
+from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.llm.deps import get_openai_client
+from app.core.llm.openai_client import OpenAIError
 from app.patients.notes.router import router as patient_notes_router
 from app.patients.schemas import (
     PatientCreate,
@@ -22,9 +26,33 @@ from app.patients.service import (
     list_patients,
     update_patient,
 )
+from app.patients.summary.schemas import PatientSummaryOut, SummaryAudience, SummaryVerbosity
+from app.patients.summary.service import PatientSummaryLLMError, PatientSummaryService
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 router.include_router(patient_notes_router)
+logger = logging.getLogger("app.patient_summary")
+
+
+def _validate_summary_params(
+    *, audience: str, verbosity: str
+) -> tuple[SummaryAudience, SummaryVerbosity]:
+    allowed_audience = {"clinician", "family", "patient", "third_party"}
+    allowed_verbosity = {"short", "medium", "long"}
+
+    if audience not in allowed_audience:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid audience. Supported values: clinician, family, patient, third_party.",
+        )
+    if verbosity not in allowed_verbosity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verbosity. Supported values: short, medium, long.",
+        )
+
+    # Cast is safe due to allowlist checks above.
+    return cast(SummaryAudience, audience), cast(SummaryVerbosity, verbosity)
 
 
 @router.get("", response_model=PatientListOut)
@@ -80,6 +108,77 @@ async def get_patient_by_id(
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     return patient
+
+
+@router.get("/{patient_id}/summary", response_model=PatientSummaryOut)
+async def get_patient_summary(
+    patient_id: uuid.UUID,
+    request: Request,
+    audience: str = Query(default="clinician"),
+    verbosity: str = Query(default="medium"),
+    session: AsyncSession = Depends(get_session),
+    openai_client=Depends(get_openai_client),
+) -> PatientSummaryOut:
+    """
+    Generate a read-only, non-persistent patient summary using an LLM.
+
+    IMPORTANT (safety):
+    - We do not store LLM output anywhere.
+    - We do not log prompts or LLM outputs (may contain PHI).
+    """
+
+    aud, verb = _validate_summary_params(audience=audience, verbosity=verbosity)
+    request_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID")
+
+    if openai_client is None:
+        logger.info(
+            "Patient summary failed (LLM not configured)",
+            extra={
+                "request_id": request_id,
+                "patient_id": str(patient_id),
+                "audience": aud,
+                "verbosity": verb,
+                "success": False,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="LLM service unavailable"
+        )
+
+    svc = PatientSummaryService(session=session, llm_client=openai_client)
+    try:
+        summary = await svc.generate_summary(patient_id=patient_id, audience=aud, verbosity=verb)
+        if summary is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    except HTTPException:
+        raise
+    except (OpenAIError, PatientSummaryLLMError):
+        logger.info(
+            "Patient summary failed",
+            extra={
+                "request_id": request_id,
+                "patient_id": str(patient_id),
+                "audience": aud,
+                "verbosity": verb,
+                "success": False,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="LLM service failed",
+        ) from None
+
+    logger.info(
+        "Patient summary generated",
+        extra={
+            "request_id": request_id,
+            "patient_id": str(patient_id),
+            "audience": aud,
+            "verbosity": verb,
+            "success": True,
+        },
+    )
+    return summary
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=PatientOut)
