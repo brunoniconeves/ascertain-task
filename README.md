@@ -98,7 +98,7 @@ curl -s -X POST localhost:8000/patients \
   -d '{"name":"Ada Lovelace","date_of_birth":"1815-12-10"}'
 ```
 
-## 📝 Patient Notes & SOAP Handling
+## Patient Notes & SOAP Handling
 
 This API supports storing patient notes as part of a patient’s medical record. Notes may be provided as **plain text** or as **uploaded files**, and may optionally follow the **SOAP (Subjective, Objective, Assessment, Plan)** clinical format.
 
@@ -113,6 +113,19 @@ The original note content is always preserved exactly as provided. Any structure
 
 
 ## Supported Inputs
+
+Right now, there is no allowlist / enum for note_type.
+
+Type/constraints:
+It’s stored as VARCHAR(50) NULL (patient_notes.note_type)
+API schema allows note_type: str | None with max_length=50
+
+Special handling:
+If note_type (trimmed, case-insensitive) equals "soap", the system attempts best-effort deterministic SOAP parsing and persists derived structured data.
+
+Any other note_type is accepted and treated as a generic label with no special parsing.
+
+So effectively: any string up to 50 chars is allowed, and only "soap" triggers the SOAP pipeline.
 
 SOAP-formatted notes may be submitted in either form:
 
