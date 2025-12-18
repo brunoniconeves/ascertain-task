@@ -5,7 +5,6 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
-.env
 .DS_Store
 *.sqlite3
 *.db
@@ -222,3 +221,4 @@ __marimo__/
 
 # Data
 data/
+k8s/secret.yaml

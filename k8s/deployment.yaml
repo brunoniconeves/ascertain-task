@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ascertain-api
+  labels:
+    app.kubernetes.io/name: ascertain-api
+    app.kubernetes.io/part-of: ascertain-task
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ascertain-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ascertain-api
+        app.kubernetes.io/part-of: ascertain-task
+    spec:
+      containers:
+        - name: api
+          # Reuse the same image produced by the existing Dockerfile.
+          # Replace/tag this to whatever you build/push (see k8s/README.md).
+          image: ascertain-task:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ascertain-config
+            - secretRef:
+                name: ascertain-secrets
+          # Notes are stored on the local filesystem. For demo purposes we keep this ephemeral.
+          # In a real cluster, map this to a PVC or object storage (documented in k8s/README.md).
+          volumeMounts:
+            - name: notes-data
+              mountPath: /app/data/notes
+          # The container entrypoint waits for DB readiness before starting the web server.
+          # A startupProbe prevents liveness from restarting the pod during that warmup phase.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60 # ~5 minutes max startup time before Kubernetes gives up
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: notes-data
+          emptyDir: {}
+
+

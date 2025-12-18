@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ascertain-api
+  labels:
+    app.kubernetes.io/name: ascertain-api
+    app.kubernetes.io/part-of: ascertain-task
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ascertain-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+
+

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ascertain-config
+  labels:
+    app.kubernetes.io/name: ascertain-api
+    app.kubernetes.io/part-of: ascertain-task
+data:
+  # Non-secret configuration mirrored from `.env.example` (same variable names).
+  #
+  # Note: keep secrets (e.g., DATABASE_URL with credentials, OPENAI_API_KEY) out of ConfigMaps.
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO" # Used by Compose overlays; safe to keep in ConfigMap.
+
+  NOTES_BASE_DIR: "./data/notes"
+  NOTES_MAX_UPLOAD_BYTES: "5242880"
+  NOTES_ALLOWED_MIME_TYPES: '["text/plain","application/pdf","image/png","image/jpeg"]'
+
+  # Optional model name (non-secret). API key is provided via Secret.
+  OPENAI_MODEL: "gpt-4o-mini"
+
+

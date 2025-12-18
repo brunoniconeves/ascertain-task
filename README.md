@@ -344,3 +344,24 @@ It installs dependencies directly (not Docker-build) to keep CI fast and aligned
 
 - **`APP_ENV`**: `development|production` (seeding runs only in development; default dev is set by Compose override)
 - **`LOG_LEVEL`**: logging level override (defaults to `DEBUG` in development, `INFO` otherwise)
+
+## Kubernetes (Optional)
+
+This project uses Docker Compose for local development.
+
+Kubernetes manifests are provided under `/k8s` to demonstrate how the
+same container image and configuration could be deployed in a cluster
+environment. Kubernetes is **not required** to run or evaluate the project.
+
+The Kubernetes setup mirrors the Docker Compose configuration:
+- Same Docker image
+- Same environment variables
+- Same application behavior
+
+See `k8s/README.md` for details, including:
+- Example `ConfigMap` + `Secret` wiring via `envFrom`
+- Conceptual deployment steps (build/push image, apply manifests, port-forward)
+- Optional local Kind smoke-test commands (for convenience only)
+- Notes on volume/persistence mapping (Docker volumes vs Kubernetes storage)
+
+
