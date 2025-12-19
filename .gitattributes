@@ -1,0 +1,2 @@
+# Garante que todos os scripts .sh usem LF (Unix) como quebra de linha
+scripts/*.sh text eol=lf
