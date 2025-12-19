@@ -1,5 +1,6 @@
-#!/bin/sh
-set -eu
+#!/bin/bash
+set -e
+set -u
 
 cd /app
 export PYTHONPATH="/app"
@@ -84,5 +85,4 @@ if [ "$APP_ENV" = "development" ]; then
 fi
 
 wait "$API_PID"
-
 
