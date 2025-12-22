@@ -1,0 +1,18 @@
+SOAP Note - Synthetic Example #023
+Title: Hypertension follow-up
+
+S:
+Follow-up for elevated home BP readings. Reports occasional headaches, no vision changes. Adherence to low-salt diet inconsistent.
+
+O:
+Vitals: BP 146/92, HR 76, BMI 29.0.
+Exam: no edema; CV/resp normal.
+
+A:
+Stage 2 hypertension (uncontrolled).
+Lifestyle factors contributing.
+
+P:
+Start amlodipine 5 mg PO daily; discuss side effects.
+Home BP log; low-salt diet; follow up in 4 weeks.
+BMP in 2-4 weeks if additional meds added later.

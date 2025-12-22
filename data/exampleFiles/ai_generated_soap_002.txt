@@ -1,0 +1,17 @@
+SOAP Note - Synthetic Example #002
+Title: Upper respiratory symptoms
+
+S:
+Cough and sore throat x4 days. Rhinorrhea, mild fatigue. Denies shortness of breath or chest pain. No GI symptoms. Home COVID test negative yesterday.
+
+O:
+Vitals: BP 118/74, HR 84, RR 18, Temp 99.1F, SpO2 98% RA.
+HEENT: Mild pharyngeal erythema, no exudate. Lungs CTA.
+
+A:
+Viral URI.
+Rule out strep low probability.
+
+P:
+Supportive care: fluids, rest, honey/tea, acetaminophen/ibuprofen PRN.
+Return precautions for persistent fever, dyspnea, worsening symptoms >7-10 days.

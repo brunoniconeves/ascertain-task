@@ -1,0 +1,15 @@
+SOAP Note - Synthetic Example #009
+Title: Skin rash
+
+S:
+Itchy rash on forearms x1 week after new detergent. No fever. No mucosal involvement.
+
+O:
+Skin: erythematous, mildly scaly patches on bilateral forearms, no vesicles.
+
+A:
+Contact dermatitis.
+
+P:
+Stop suspected irritant; topical steroid BID x7-10 days.
+Antihistamine PRN itching. Return if spreading or signs of infection.

@@ -1,0 +1,22 @@
+SOAP Note - Synthetic Example #001
+Title: Annual preventive visit
+
+S:
+Here for annual wellness visit. No acute complaints. Exercises 2-3x/week. Diet mixed. Denies chest pain, dyspnea, syncope, focal weakness. No tobacco; rare alcohol.
+
+O:
+Vitals: BP 126/78, HR 72, RR 16, Temp 98.2F, BMI 27.1.
+Gen: Alert, NAD.
+CV: RRR, no murmurs.
+Resp: CTA bilat.
+Abd: Soft, NT.
+Screening labs ordered: CBC, CMP, lipid panel.
+
+A:
+Well adult exam.
+Overweight (BMI 27).
+Cardiometabolic risk screening.
+
+P:
+Lifestyle counseling: Mediterranean-style diet, 150 min/wk moderate exercise.
+Review labs when resulted; follow up 6-12 months or sooner PRN.

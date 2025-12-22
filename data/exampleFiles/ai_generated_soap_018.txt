@@ -1,0 +1,15 @@
+SOAP Note - Synthetic Example #018
+Title: Asthma check
+
+S:
+Asthma follow-up. Uses rescue inhaler ~3x/week. Nighttime symptoms 1x/week. Triggers: cold air and exercise.
+
+O:
+Vitals: SpO2 97% RA. Lungs: mild end-expiratory wheeze.
+
+A:
+Asthma, not well controlled.
+
+P:
+Start low-dose ICS daily; review inhaler technique.
+Rescue inhaler PRN. Peak flow log. Follow up in 6-8 weeks.

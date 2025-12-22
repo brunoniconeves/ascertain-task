@@ -1,0 +1,17 @@
+SOAP Note - Synthetic Example #015
+Title: Low back pain
+
+S:
+Low back pain x1 week after lifting. No trauma. No weakness, numbness, bowel/bladder changes.
+
+O:
+Vitals stable. Back: paraspinal tenderness, no midline tenderness. Neuro: 5/5 strength, sensation intact, negative straight leg raise.
+
+A:
+Acute mechanical low back pain.
+No red flags.
+
+P:
+NSAIDs PRN with food; heat; gentle stretching.
+Avoid heavy lifting 1-2 weeks. PT if not improving in 2-3 weeks.
+Return precautions for neurologic deficits or bowel/bladder symptoms.

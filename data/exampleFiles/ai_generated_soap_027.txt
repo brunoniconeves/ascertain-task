@@ -1,0 +1,17 @@
+SOAP Note - Synthetic Example #027
+Title: Anxiety symptoms
+
+S:
+Reports excessive worry and insomnia x2 months. Difficulty concentrating. Denies SI/HI. No substance use.
+
+O:
+Vitals stable. Mental status: cooperative, linear thought process, appropriate affect.
+
+A:
+Generalized anxiety symptoms.
+Insomnia.
+
+P:
+Discuss CBT resources; sleep hygiene.
+Consider SSRI trial; shared decision-making.
+Follow up in 4-6 weeks; sooner if worsening.

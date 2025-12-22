@@ -1,0 +1,19 @@
+SOAP Note - Synthetic Example #004
+Title: Type 2 diabetes follow-up
+
+S:
+Routine DM2 follow-up. Reports improved diet; occasional post-meal glucose spikes. No hypoglycemia. Denies neuropathy symptoms.
+
+O:
+Vitals: BP 132/80, HR 70, BMI 31.2.
+Foot exam: intact sensation, no ulcers.
+POC A1c 7.4%.
+
+A:
+Type 2 diabetes, above goal.
+Obesity.
+
+P:
+Increase metformin to 1000 mg BID if tolerated.
+Nutrition referral; consider GLP-1 RA discussion next visit.
+Repeat A1c in 3 months.
